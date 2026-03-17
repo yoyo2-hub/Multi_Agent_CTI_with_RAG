@@ -5,3 +5,4 @@ cleaned_data/
 JSONL\darkgram_cti.jsonl
 __pycache__/
 *.pyc
+src/.env
