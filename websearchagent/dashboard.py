@@ -1,8 +1,13 @@
 import streamlit as st
 import sys
-sys.path.append("e:/RAG_CTI/websearchagent")
-from infrastructure_collecte import collecter_tout
 
+import os
+
+# Ajouter le dossier websearchagent au chemin Python
+sys.path.append("C:/Users/Hamza/Desktop/emna/RAG_CTI/websearchagent")
+
+# Maintenant l'import fonctionne ✅
+from infrastructure_collecte import collecter_tout
 # ─────────────────────────────────────
 # CONFIG PAGE
 # ─────────────────────────────────────

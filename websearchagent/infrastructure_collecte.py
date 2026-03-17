@@ -1,3 +1,6 @@
+from datetime import datetime
+import os
+
 import requests
 import feedparser
 import re
@@ -6,6 +9,7 @@ import time
 import random
 from bs4 import BeautifulSoup
 from difflib import SequenceMatcher
+from notifications import envoyer_alertes
 
 # ─────────────────────────────────────
 # CLÉS API
@@ -70,27 +74,35 @@ def collecter_rss():
 # ─────────────────────────────────────
 def collecter_reddit():
     url = "https://www.reddit.com/r/netsec/hot.json?limit=5"
-    
+
+    # User-Agent plus réaliste
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept"    : "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer"   : "https://www.reddit.com/",
+    }
+
     # Attendre AVANT la requête
     attendre()
-    
+
     try:
         response = requests.get(
             url,
-            headers=get_headers_aleatoires(),
+            headers=headers,
             timeout=30
         )
-        
-        # Vérifier que la réponse est bonne
+
+        if response.status_code == 403:
+            print("  ❌ Reddit bloqué 403 → on essaie autrement...")
+            return []
+
+
         if response.status_code != 200:
             print(f"  ❌ Reddit erreur : {response.status_code}")
             return []
-            
-        if not response.text:
-            print(f"  ❌ Reddit réponse vide")
-            return []
-        
-        data = response.json()
+
+        data  = response.json()
         posts = []
         for post in data["data"]["children"]:
             info = post["data"]
@@ -101,10 +113,12 @@ def collecter_reddit():
                 "resume" : info["selftext"][:300],
             })
         return posts
-        
+
     except Exception as e:
         print(f"  ❌ Reddit erreur : {e}")
         return []
+
+
 
 # ─────────────────────────────────────
 # 1.2 STACKOVERFLOW
@@ -139,20 +153,36 @@ def collecter_stackoverflow():
 # 1.3 ALIENVAULT OTX
 # ─────────────────────────────────────
 def collecter_otx():
-    url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+    url     = "https://otx.alienvault.com/api/v1/pulses/subscribed"
     headers = {"X-OTX-API-KEY": OTX_API_KEY}
-    response = requests.get(url, headers=headers)
-    attendre()                                 # ✅ Solution 2
-    data = response.json()
-    menaces = []
-    for pulse in data.get("results", [])[:5]:
-        menaces.append({
-            "source" : "AlienVault OTX",
-            "titre"  : pulse["name"],
-            "lien"   : f"https://otx.alienvault.com/pulse/{pulse['id']}",
-            "resume" : pulse["description"][:300],
-        })
-    return menaces
+
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+
+        # Vérifier que la réponse est bonne
+        if response.status_code != 200:
+            print(f"  ❌ OTX erreur status : {response.status_code}")
+            return []
+
+        if not response.text:
+            print(f"  ❌ OTX réponse vide")
+            return []
+
+        data = response.json()
+        menaces = []
+        for pulse in data.get("results", [])[:5]:
+            menaces.append({
+                "source" : "AlienVault OTX",
+                "titre"  : pulse["name"],
+                "lien"   : f"https://otx.alienvault.com/pulse/{pulse['id']}",
+                "resume" : pulse["description"][:300],
+            })
+        attendre()
+        return menaces
+
+    except Exception as e:
+        print(f"  ❌ OTX erreur : {e}")
+        return []
 
 # ─────────────────────────────────────
 # 3.1 TOR
@@ -265,6 +295,8 @@ def dedupliquer(articles: list) -> list:
 # 2.2 ANALYSE PHI3
 # ─────────────────────────────────────
 def analyser_menace(article: dict) -> dict:
+    import requests as rq                  # ✅ alias pour éviter conflit
+
     prompt = f"""
 Tu es un expert en cybersécurité CTI.
 Analyse cette menace et réponds EXACTEMENT dans ce format :
@@ -279,22 +311,24 @@ Titre  : {article['titre']}
 Source : {article['source']}
 Texte  : {article.get('resume', '')}
 """
-    reponse = requests.post(
-        "http://localhost:11435/api/chat",  # ✅ port correct
-        json={
-            "model"   : "phi3",
-            "messages": [{"role": "user", "content": prompt}],
-            "stream"  : True
-        },
-        stream=True
-    )
-    texte_complet = ""
-    for ligne in reponse.iter_lines():
-        if ligne:
-            data = json.loads(ligne)
-            if "message" in data:
-                texte_complet += data["message"].get("content", "")
-    article["analyse"] = texte_complet
+    try:
+        reponse = rq.post(                 # ✅ rq pas requests
+            "http://localhost:11434/api/generate",
+            json={
+                "model" : "phi3",          # ✅ model
+                "prompt": prompt,          # ✅ prompt pas messages
+                "stream": False            # ✅ False pas True
+            },
+            timeout=120
+        )
+        # ✅ response pas message
+        texte_complet = reponse.json().get("response", "")
+        article["analyse"] = texte_complet
+
+    except Exception as e:
+        print(f"  ❌ Erreur Phi3 : {e}")
+        article["analyse"] = "CRITICITE: INCONNUE\nTYPE: autre\nRESUME: Erreur\nVRAIE_MENACE: NON"
+
     return article
 
 def analyser_tout(articles: list) -> list:
@@ -303,7 +337,101 @@ def analyser_tout(articles: list) -> list:
         print(f"  🤖 Analyse {i+1}/{len(articles)} : {article['titre'][:50]}...")
         resultats.append(analyser_menace(article))
     return resultats
+def formater_menace(menace: dict, index: int) -> dict:
+    analyse     = menace.get("analyse", "")
+    criticite   = "INCONNUE"
+    type_menace = "autre"
+    resume_phi3 = ""
 
+    for ligne in analyse.split("\n"):
+        if "CRITICITE:" in ligne:
+            criticite   = ligne.replace("CRITICITE:", "").strip()
+        if "TYPE:" in ligne:
+            type_menace = ligne.replace("TYPE:", "").strip()
+        if "RESUME:" in ligne:
+            resume_phi3 = ligne.replace("RESUME:", "").strip()
+
+    # ── TEXT — format exact comme ton projet ──
+    text_formatted = (
+        f"[POST_ID: {index}] | "
+        f"TYPE: POST | "
+        f"CHANNEL: {menace.get('source', '')} | "
+        f"CONTENT: {menace.get('titre', '')} "
+        f"{menace.get('resume', '')[:200]}"
+    )
+
+    # ── METADATA — format exact comme ton projet ──
+    metadata = {
+        "url"               : menace.get("lien", ""),
+        "date"              : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "views"             : None,
+        "forwards"          : None,
+        "replies"           : None,
+        "reactions"         : None,
+        "out"               : False,
+        "mentioned"         : False,
+        "media_unread"      : False,
+        "silent"            : False,
+        "post"              : True,
+        "from_scheduled"    : False,
+        "legacy"            : False,
+        "edit_hide"         : False,
+        "pinned"            : False,
+        "noforwards"        : False,
+        "peer_channel"      : None,
+        "from_id_user"      : None,
+        "fwd_from"          : None,
+        "via_bot_id"        : None,
+        "reply_to_msg_id"   : None,
+        "reply_to_scheduled": None,
+        "forum_topic"       : None,
+        "media_photo_id"    : None,
+        "reply_markup"      : None,
+        "edit_date"         : None,
+        "post_author"       : None,
+        "grouped_id"        : None,
+        "restriction_reason": "[]",
+        "ttl_period"        : None,
+        "category"          : criticite.lower(),
+        "doc_type"          : "cti_threat",
+        "channel_name"      : menace.get("source", ""),
+        "recovered"         : False,
+        # ── Champs CTI spécifiques ──
+        "mots_trouves"      : menace.get("mots_trouves", []),
+        "criticite"         : criticite,
+        "type_menace"       : type_menace,
+        "resume_phi3"       : resume_phi3,
+        "analyse_complete"  : analyse,
+    }
+
+    return {
+        "text"    : text_formatted,
+        "metadata": metadata
+    }
+def sauvegarder_json(menaces: list):
+    print("\n💾 Sauvegarde JSONL en cours...")
+
+    # Fichier JSONL → chaque ligne = un objet
+    FICHIER_JSONL = "C:\\Users\\Hamza\\Desktop\\emna\\RAG_CTI\\websearchagent\\cti_menaces.jsonl"
+
+    # Compter les lignes existantes
+    index_debut = 0
+    if os.path.exists(FICHIER_JSONL):
+        with open(FICHIER_JSONL, "r", encoding="utf-8") as f:
+            index_debut = sum(1 for _ in f)
+
+    # Ajouter les nouvelles menaces
+    with open(FICHIER_JSONL, "a", encoding="utf-8") as f:  # "a" = append
+        for i, menace in enumerate(menaces):
+            index         = index_debut + i + 1
+            menace_formatee = formater_menace(menace, index)
+
+            # Écrire chaque menace sur une seule ligne
+            f.write(json.dumps(menace_formatee, ensure_ascii=False) + "\n")
+            print(f"  ✅ Sauvegardé : {menace['titre'][:50]}")
+
+    print(f"✅ {len(menaces)} menaces sauvegardées en JSONL !")
+    print(f"✅ Fichier : {FICHIER_JSONL}")
 # ─────────────────────────────────────
 # TOUT ASSEMBLER
 # ─────────────────────────────────────
@@ -347,6 +475,10 @@ def collecter_tout():
     print("\n🤖 Analyse Phi3 en cours...")
     analyses = analyser_tout(uniques)
     print(f"✅ Analyse terminée !")
+    print("\n📧 Envoi des alertes...")
+    sauvegarder_json(analyses)
+
+    envoyer_alertes(analyses)
 
     return analyses
 
