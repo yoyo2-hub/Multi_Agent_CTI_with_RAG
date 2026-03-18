@@ -1,0 +1,42 @@
+[
+    {
+        "text": "[MENACE_ID: 1] | TYPE: VULNERABILITY | SOURCE: TheHackerNews | CONTENT: Critical CVE-2025 Found in Windows | RESUME: Faille critique Windows exploitée",
+        "metadata": {
+            "menace_id": 1,
+            "source": "TheHackerNews",
+            "titre": "Critical CVE-2025 Found in Windows",
+            "lien": "https://thehackernews.com/...",
+            "resume": "A critical vulnerability found in Windows",
+            "mots_trouves": [
+                "CVE",
+                "exploit",
+                "windows"
+            ],
+            "criticite": "CRITIQUE",
+            "type_menace": "vulnerability",
+            "resume_phi3": "Faille critique Windows exploitée",
+            "analyse_complete": "CRITICITE: CRITIQUE\nTYPE: vulnerability\nRESUME: Faille critique Windows exploitée\nVRAIE_MENACE: OUI",
+            "date_collecte": "2026-03-14 11:55:59"
+        }
+    },
+    {
+        "text": "[MENACE_ID: 2] | TYPE: APT | SOURCE: AlienVault OTX | CONTENT: KONNI PowerShell Backdoors | RESUME: Groupe nord-coréen utilise backdoor PowerShell",
+        "metadata": {
+            "menace_id": 2,
+            "source": "AlienVault OTX",
+            "titre": "KONNI PowerShell Backdoors",
+            "lien": "https://otx.alienvault.com/...",
+            "resume": "North Korea APT group using backdoor",
+            "mots_trouves": [
+                "backdoor",
+                "APT",
+                "phishing"
+            ],
+            "criticite": "ELEVEE",
+            "type_menace": "APT",
+            "resume_phi3": "Groupe nord-coréen utilise backdoor PowerShell",
+            "analyse_complete": "CRITICITE: ELEVEE\nTYPE: APT\nRESUME: Groupe nord-coréen utilise backdoor PowerShell\nVRAIE_MENACE: OUI",
+            "date_collecte": "2026-03-14 11:55:59"
+        }
+    }
+]

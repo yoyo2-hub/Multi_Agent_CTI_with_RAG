@@ -4,14 +4,17 @@ import re
 import json
 import time
 import random
+import os
 from bs4 import BeautifulSoup
 from difflib import SequenceMatcher
+from datetime import datetime
+from notificationsemail import envoyer_alertes
 
 # ─────────────────────────────────────
 # CLÉS API
 # ─────────────────────────────────────
-OTX_API_KEY = "1552be520d74f388e1f0e7349c76a351020ecf8cdee408d2d8284350547307df"
-
+OTX_API_KEY  = "1552be520d74f388e1f0e7349c76a351020ecf8cdee408d2d8284350547307df"
+FICHIER_JSON = "e:/RAG_CTI/websearchagent/cti_menaces.json"
 
 # ─────────────────────────────────────
 # ANONYMISATION — 3 SOLUTIONS
@@ -305,6 +308,103 @@ def analyser_tout(articles: list) -> list:
     return resultats
 
 # ─────────────────────────────────────
+# 4.3 FORMAT RAG + SAUVEGARDE JSON
+# ─────────────────────────────────────
+def formater_menace(menace: dict, index: int) -> dict:
+    analyse     = menace.get("analyse", "")
+    criticite   = "INCONNUE"
+    type_menace = "autre"
+    resume_phi3 = ""
+
+    # Extraire les champs depuis l'analyse Phi3
+    for ligne in analyse.split("\n"):
+        if "CRITICITE:" in ligne:
+            criticite   = ligne.replace("CRITICITE:", "").strip()
+        if "TYPE:" in ligne:
+            type_menace = ligne.replace("TYPE:", "").strip()
+        if "RESUME:" in ligne:
+            resume_phi3 = ligne.replace("RESUME:", "").strip()
+
+    # Format text — identique au projet RAG
+    text_formatted = (
+        f"[POST_ID: {index}] | "
+        f"TYPE: POST | "
+        f"CHANNEL: {menace.get('source', '')} | "
+        f"CONTENT: {menace.get('titre', '')} "
+        f"{menace.get('resume', '')[:200]}"
+    )
+
+    # Format metadata — identique au projet RAG
+    metadata = {
+        "url"               : menace.get("lien", ""),
+        "date"              : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "views"             : None,
+        "forwards"          : None,
+        "replies"           : None,
+        "out"               : False,
+        "mentioned"         : False,
+        "media_unread"      : False,
+        "silent"            : False,
+        "post"              : True,
+        "from_scheduled"    : False,
+        "legacy"            : False,
+        "edit_hide"         : False,
+        "pinned"            : False,
+        "noforwards"        : False,
+        "peer_channel"      : None,
+        "from_id_user"      : None,
+        "via_bot_id"        : None,
+        "reply_to_msg_id"   : None,
+        "reply_to_scheduled": None,
+        "forum_topic"       : None,
+        "media_photo_id"    : None,
+        "reply_markup"      : None,
+        "edit_date"         : None,
+        "post_author"       : None,
+        "grouped_id"        : None,
+        "ttl_period"        : None,
+        # ── Champs CTI spécifiques ──
+        "category"          : criticite.lower(),
+        "doc_type"          : "cti_threat",
+        "channel_name"      : menace.get("source", ""),
+        "recovered"         : False,
+        "mots_trouves"      : menace.get("mots_trouves", []),
+        "criticite"         : criticite,
+        "type_menace"       : type_menace,
+        "resume_phi3"       : resume_phi3,
+        "analyse_complete"  : analyse,
+    }
+
+    return {
+        "text"    : text_formatted,
+        "metadata": metadata
+    }
+
+def sauvegarder_json(menaces: list):
+    print("\n💾 Sauvegarde JSON en cours...")
+
+    # Charger les données existantes
+    donnees_existantes = []
+    if os.path.exists(FICHIER_JSON):
+        with open(FICHIER_JSON, "r", encoding="utf-8") as f:
+            donnees_existantes = json.load(f)
+
+    # Formater les nouvelles menaces
+    nouvelles = []
+    for i, menace in enumerate(menaces):
+        index = len(donnees_existantes) + i + 1
+        nouvelles.append(formater_menace(menace, index))
+        print(f"  ✅ Formaté : {menace['titre'][:50]}")
+
+    # Assembler et sauvegarder
+    toutes = donnees_existantes + nouvelles
+    with open(FICHIER_JSON, "w", encoding="utf-8") as f:
+        json.dump(toutes, f, ensure_ascii=False, indent=4)
+
+    print(f"✅ {len(nouvelles)} menaces sauvegardées !")
+    print(f"✅ Total JSON : {len(toutes)} menaces")
+
+# ─────────────────────────────────────
 # TOUT ASSEMBLER
 # ─────────────────────────────────────
 def collecter_tout():
@@ -347,6 +447,11 @@ def collecter_tout():
     print("\n🤖 Analyse Phi3 en cours...")
     analyses = analyser_tout(uniques)
     print(f"✅ Analyse terminée !")
+
+    # 4.3 Sauvegarde JSON
+    sauvegarder_json(analyses)
+
+    envoyer_alertes(analyses)
 
     return analyses
 
