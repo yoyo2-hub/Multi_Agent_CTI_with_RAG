@@ -88,3 +88,4 @@ if "menaces" in st.session_state:
             st.divider()
             st.write("**Analyse Phi3 :**")
             st.code(analyse)
+#streamlit run dashboard.py

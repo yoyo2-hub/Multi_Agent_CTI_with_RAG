@@ -9,7 +9,7 @@ import time
 import random
 from bs4 import BeautifulSoup
 from difflib import SequenceMatcher
-from notifications import envoyer_alertes
+from notificationsemail import envoyer_alertes
 
 # ─────────────────────────────────────
 # CLÉS API
@@ -306,24 +306,33 @@ TYPE: [ransomware / APT / vulnerability / breach / malware / autre]
 RESUME: résumé en 1 phrase simple
 VRAIE_MENACE: [OUI / NON]
 
+
+
+
+
+
+
 Menace à analyser :
 Titre  : {article['titre']}
 Source : {article['source']}
+Source : {article['lien']}
 Texte  : {article.get('resume', '')}
 """
     try:
         reponse = rq.post(                 # ✅ rq pas requests
-            "http://localhost:11434/api/generate",
+            "http://localhost:11435/api/generate",
             json={
                 "model" : "phi3",          # ✅ model
                 "prompt": prompt,          # ✅ prompt pas messages
                 "stream": False            # ✅ False pas True
             },
-            timeout=120
+            timeout=300
         )
         # ✅ response pas message
         texte_complet = reponse.json().get("response", "")
         article["analyse"] = texte_complet
+        print(type(texte_complet))
+        print(texte_complet)
 
     except Exception as e:
         print(f"  ❌ Erreur Phi3 : {e}")
@@ -335,103 +344,26 @@ def analyser_tout(articles: list) -> list:
     resultats = []
     for i, article in enumerate(articles):
         print(f"  🤖 Analyse {i+1}/{len(articles)} : {article['titre'][:50]}...")
-        resultats.append(analyser_menace(article))
+        
+        # Analyse la menace et récupère le dict
+        menace = analyser_menace(article)
+        
+        # Transforme tout le dict en string lisible
+        texte_complet = (
+            f"Source : {article['source']}\n"
+            f"Titre  : {article['titre']}\n"
+            f"url  : {article['lien']}\n"
+            f"Résumé : {article.get('resume','')}\n"
+            f"Mots clés : {', '.join(menace.get('mots_trouves', []))}\n"
+            f"Analyse Phi3 :\n{menace.get('analyse','')}\n"
+            "-------------------------\n"
+        )
+        
+        # Ajoute le string à la liste
+        resultats.append(texte_complet)
+    
     return resultats
-def formater_menace(menace: dict, index: int) -> dict:
-    analyse     = menace.get("analyse", "")
-    criticite   = "INCONNUE"
-    type_menace = "autre"
-    resume_phi3 = ""
 
-    for ligne in analyse.split("\n"):
-        if "CRITICITE:" in ligne:
-            criticite   = ligne.replace("CRITICITE:", "").strip()
-        if "TYPE:" in ligne:
-            type_menace = ligne.replace("TYPE:", "").strip()
-        if "RESUME:" in ligne:
-            resume_phi3 = ligne.replace("RESUME:", "").strip()
-
-    # ── TEXT — format exact comme ton projet ──
-    text_formatted = (
-        f"[POST_ID: {index}] | "
-        f"TYPE: POST | "
-        f"CHANNEL: {menace.get('source', '')} | "
-        f"CONTENT: {menace.get('titre', '')} "
-        f"{menace.get('resume', '')[:200]}"
-    )
-
-    # ── METADATA — format exact comme ton projet ──
-    metadata = {
-        "url"               : menace.get("lien", ""),
-        "date"              : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "views"             : None,
-        "forwards"          : None,
-        "replies"           : None,
-        "reactions"         : None,
-        "out"               : False,
-        "mentioned"         : False,
-        "media_unread"      : False,
-        "silent"            : False,
-        "post"              : True,
-        "from_scheduled"    : False,
-        "legacy"            : False,
-        "edit_hide"         : False,
-        "pinned"            : False,
-        "noforwards"        : False,
-        "peer_channel"      : None,
-        "from_id_user"      : None,
-        "fwd_from"          : None,
-        "via_bot_id"        : None,
-        "reply_to_msg_id"   : None,
-        "reply_to_scheduled": None,
-        "forum_topic"       : None,
-        "media_photo_id"    : None,
-        "reply_markup"      : None,
-        "edit_date"         : None,
-        "post_author"       : None,
-        "grouped_id"        : None,
-        "restriction_reason": "[]",
-        "ttl_period"        : None,
-        "category"          : criticite.lower(),
-        "doc_type"          : "cti_threat",
-        "channel_name"      : menace.get("source", ""),
-        "recovered"         : False,
-        # ── Champs CTI spécifiques ──
-        "mots_trouves"      : menace.get("mots_trouves", []),
-        "criticite"         : criticite,
-        "type_menace"       : type_menace,
-        "resume_phi3"       : resume_phi3,
-        "analyse_complete"  : analyse,
-    }
-
-    return {
-        "text"    : text_formatted,
-        "metadata": metadata
-    }
-def sauvegarder_json(menaces: list):
-    print("\n💾 Sauvegarde JSONL en cours...")
-
-    # Fichier JSONL → chaque ligne = un objet
-    FICHIER_JSONL = "C:\\Users\\Hamza\\Desktop\\emna\\RAG_CTI\\websearchagent\\cti_menaces.jsonl"
-
-    # Compter les lignes existantes
-    index_debut = 0
-    if os.path.exists(FICHIER_JSONL):
-        with open(FICHIER_JSONL, "r", encoding="utf-8") as f:
-            index_debut = sum(1 for _ in f)
-
-    # Ajouter les nouvelles menaces
-    with open(FICHIER_JSONL, "a", encoding="utf-8") as f:  # "a" = append
-        for i, menace in enumerate(menaces):
-            index         = index_debut + i + 1
-            menace_formatee = formater_menace(menace, index)
-
-            # Écrire chaque menace sur une seule ligne
-            f.write(json.dumps(menace_formatee, ensure_ascii=False) + "\n")
-            print(f"  ✅ Sauvegardé : {menace['titre'][:50]}")
-
-    print(f"✅ {len(menaces)} menaces sauvegardées en JSONL !")
-    print(f"✅ Fichier : {FICHIER_JSONL}")
 # ─────────────────────────────────────
 # TOUT ASSEMBLER
 # ─────────────────────────────────────
@@ -476,9 +408,11 @@ def collecter_tout():
     analyses = analyser_tout(uniques)
     print(f"✅ Analyse terminée !")
     print("\n📧 Envoi des alertes...")
-    sauvegarder_json(analyses)
-
-    envoyer_alertes(analyses)
+    print(type(analyses))    
+    print(analyses[0])     # list
+    print(type(analyses[0]))      # dict
+   
+    
 
     return analyses
 
