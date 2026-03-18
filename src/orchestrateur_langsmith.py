@@ -18,17 +18,17 @@ from typing import TypedDict
 from dotenv import load_dotenv
 import os
 
-# # Charger le fichier .env
-load_dotenv(dotenv_path="C:/Users/Hamza/Desktop/emna/RAG_CTI/test/.env")
+# # # Charger le fichier .env
+# load_dotenv(dotenv_path="C:/Users/Hamza/Desktop/emna/RAG_CTI/test/.env")
 
-# Configurer LangSmith depuis le .env
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_API_KEY"]    = os.getenv("LANGCHAIN_API_KEY")
-os.environ["LANGCHAIN_PROJECT"]    = os.getenv("LANGCHAIN_PROJECT")
+# # Configurer LangSmith depuis le .env
+# os.environ["LANGCHAIN_TRACING_V2"] = "true"
+# os.environ["LANGCHAIN_API_KEY"]    = os.getenv("LANGCHAIN_API_KEY")
+# os.environ["LANGCHAIN_PROJECT"]    = os.getenv("LANGCHAIN_PROJECT")
 
-print("✅ LangSmith configuré !")
-print(f"   Projet : {os.getenv('LANGCHAIN_PROJECT')}")
-print(f"   URL    : https://smith.langchain.com")
+# print("✅ LangSmith configuré !")
+# print(f"   Projet : {os.getenv('LANGCHAIN_PROJECT')}")
+# print(f"   URL    : https://smith.langchain.com")
 
 # ─────────────────────────────────────────────
 # CHEMINS DES 3 AGENTS
