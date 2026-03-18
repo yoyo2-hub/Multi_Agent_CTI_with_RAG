@@ -10,7 +10,7 @@ pandas>=2.0.0
 jq>=1.6.0
 # --- Intelligence Artificielle (Local & Embeddings) ---
 langchain-ollama         # INDISPENSABLE pour Phi-3.5  
-torch==2.8.0
+torch>=2.9.0
 
 # --- Manipulation de données ---
 numpy==2.0.2
