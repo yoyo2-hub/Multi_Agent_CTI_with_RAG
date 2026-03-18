@@ -1,3 +1,15 @@
+# Environnements virtuels
+venv/
+.env/
+
+# Fichiers compilés Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / éditeurs
+.vscode/
+.idea/
 venv/
 venv311/
 data/
@@ -6,4 +18,7 @@ JSONL\darkgram_cti.jsonl
 __pycache__/
 *.pyc
 src/.env
+<<<<<<< HEAD
 DarkGram-main/
+=======
+>>>>>>> a16a227717a4c7044911d0a3ef51c9ea5ac9a8ee
