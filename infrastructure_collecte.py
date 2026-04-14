@@ -252,26 +252,26 @@ def collecter_pastebin():
 # ─────────────────────────────────────
 # 2.1 FILTRAGE
 # ─────────────────────────────────────
-MOTS_CLES = [
-    "CVE", "vulnerability", "exploit", "zero-day", "patch",
-    "malware", "ransomware", "backdoor", "trojan", "spyware",
-    "attack", "breach", "hack", "phishing", "APT",
-    "fortinet", "windows", "linux", "cisco", "android",
-]
+# MOTS_CLES = [
+#     "CVE", "vulnerability", "exploit", "zero-day", "patch",
+#     "malware", "ransomware", "backdoor", "trojan", "spyware",
+#     "attack", "breach", "hack", "phishing", "APT",
+#     "fortinet", "windows", "linux", "cisco", "android",
+# ]
 
-def filtrer(articles: list) -> list:
-    articles_importants = []
-    for article in articles:
-        texte = article["titre"] + " " + article.get("resume", "")
-        texte = texte.lower()
-        mots_trouves = []
-        for mot in MOTS_CLES:
-            if re.search(mot.lower(), texte):
-                mots_trouves.append(mot)
-        if len(mots_trouves) >= 2:
-            article["mots_trouves"] = mots_trouves
-            articles_importants.append(article)
-    return articles_importants
+# def filtrer(articles: list) -> list:
+#     articles_importants = []
+#     for article in articles:
+#         texte = article["titre"] + " " + article.get("resume", "")
+#         texte = texte.lower()
+#         mots_trouves = []
+#         for mot in MOTS_CLES:
+#             if re.search(mot.lower(), texte):
+#                 mots_trouves.append(mot)
+#         if len(mots_trouves) >= 2:
+#             article["mots_trouves"] = mots_trouves
+#             articles_importants.append(article)
+#     return articles_importants
 
 # ─────────────────────────────────────
 # 2.3 DÉDUPLICATION
@@ -396,12 +396,12 @@ def collecter_tout():
     print(f"   → Tor           : {len(tor)}")
     print(f"   → Pastebin      : {len(pastebin)}")
 
-    print("\n🔎 Filtrage en cours...")
-    filtres = filtrer(tous)
-    print(f"✅ Après filtrage : {len(filtres)} éléments")
+    # print("\n🔎 Filtrage en cours...")
+    # filtres = filtrer(tous)
+    # print(f"✅ Après filtrage : {len(filtres)} éléments")
 
     print("\n🧹 Déduplication en cours...")
-    uniques = dedupliquer(filtres)
+    uniques = dedupliquer(tous)
     print(f"✅ Après déduplication : {len(uniques)} éléments uniques")
 
     print("\n🤖 Analyse Phi3 en cours...")
